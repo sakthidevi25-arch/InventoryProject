@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: inventory-backend
+    runtime: python
+    plan: free
+    pythonVersion: 3.12.3
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn backend.api.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        value: sqlite:///./inventory.db
+      - key: SQLITE_PATH
+        value: ./inventory.db
+      - key: CORS_ORIGINS
+        fromService:
+          name: inventory-frontend
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+
+  - type: web
+    name: inventory-frontend
+    runtime: python
+    plan: free
+    pythonVersion: 3.12.3
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run frontend/app.py --server.port $PORT --server.address 0.0.0.0
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: API_BASE_URL
+        fromService:
+          name: inventory-backend
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
