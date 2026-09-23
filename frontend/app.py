@@ -5,7 +5,7 @@ import requests
 import streamlit as st
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from api_config import API_BASE_URL
+from api_config import API_BASE_URL, api_request, error_detail
 from ui import hero, inject_styles
 
 
@@ -18,7 +18,14 @@ if "token" not in st.session_state:
 
 
 def login_user(username: str, password: str):
-    response = requests.post(f"{API_BASE_URL}/auth/login", json={"username": username, "password": password}, timeout=10)
+    response = api_request(
+        "POST",
+        "/auth/login",
+        json_body={"username": username, "password": password},
+    )
+    if response is None:
+        st.error("Cannot reach backend. It may still be starting; please try again.")
+        return
     if response.status_code == 200:
         data = response.json()
         st.session_state.token = data["access_token"]
@@ -26,7 +33,7 @@ def login_user(username: str, password: str):
         st.success("Logged in successfully")
         st.rerun()
     else:
-        st.error(response.json().get("detail", "Login failed"))
+        st.error(error_detail(response, "Login failed"))
 
 
 if st.session_state.token is None:
@@ -45,11 +52,11 @@ if st.session_state.token is None:
             "password": "Demo@1234",
             "role_name": "User",
         }
-        response = requests.post(f"{API_BASE_URL}/auth/register", json=payload, timeout=10)
-        if response.status_code == 201:
+        response = api_request("POST", "/auth/register", json_body=payload)
+        if response is not None and response.status_code == 201:
             st.success("Demo user created. Try logging in.")
         else:
-            st.error(response.json())
+            st.error(error_detail(response, "Registration failed"))
     st.stop()
 
 headers = {"Authorization": f"Bearer {st.session_state.token}"}
@@ -70,9 +77,9 @@ with st.sidebar:
 
 
 def api_get(path: str):
-    response = requests.get(f"{API_BASE_URL}{path}", headers=headers, timeout=10)
-    if response.status_code != 200:
-        st.error(f"Request failed: {response.status_code} - {response.text}")
+    response = api_request("GET", path, headers=headers)
+    if response is None or response.status_code != 200:
+        st.error(f"Request failed: {getattr(response, 'status_code', 'no response')} - {error_detail(response) if response else 'backend unreachable'}")
         return []
     return response.json()
 

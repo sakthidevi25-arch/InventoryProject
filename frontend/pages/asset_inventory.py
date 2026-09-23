@@ -5,7 +5,7 @@ import requests
 import streamlit as st
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from api_config import API_BASE_URL
+from api_config import API_BASE_URL, api_request, error_detail
 from ui import hero, inject_styles
 
 st.set_page_config(page_title="Asset Inventory", page_icon="🖥️")
@@ -31,10 +31,13 @@ CRITICALITIES = ["Low", "Medium", "High", "Critical"]
 
 
 def fetch_assets():
-    response = requests.get(f"{API_BASE_URL}/assets/", headers=headers, timeout=10)
+    response = api_request("GET", "/assets/", headers=headers)
+    if response is None:
+        st.error("Cannot reach backend. It may still be starting; please try again.")
+        return []
     if response.status_code == 200:
         return response.json()
-    st.error(f"Request failed: {response.status_code} - {response.text}")
+    st.error(f"Request failed: {response.status_code} - {error_detail(response)}")
     return []
 
 
@@ -76,12 +79,12 @@ with tab_create:
 
     if submitted:
         payload = asset_payload(asset_id, asset_name, asset_category, cloud_provider, account_id, region, owner, environment, criticality, description)
-        response = requests.post(f"{API_BASE_URL}/assets/", json=payload, headers=headers, timeout=10)
-        if response.status_code == 200:
+        response = api_request("POST", "/assets/", headers=headers, json_body=payload)
+        if response is not None and response.status_code == 200:
             st.success("Asset created successfully")
             st.rerun()
         else:
-            st.error(response.text)
+            st.error(error_detail(response, "Failed to create asset"))
 
 with tab_manage:
     if not assets:
@@ -108,23 +111,23 @@ with tab_manage:
 
         if updated:
             payload = asset_payload(asset_id, asset_name, asset_category, cloud_provider, account_id, region, owner, environment, criticality, description)
-            response = requests.put(f"{API_BASE_URL}/assets/{selected['id']}", json=payload, headers=headers, timeout=10)
-            if response.status_code == 200:
+            response = api_request("PUT", f"/assets/{selected['id']}", headers=headers, json_body=payload)
+            if response is not None and response.status_code == 200:
                 st.success("Asset updated successfully")
                 st.rerun()
             else:
-                st.error(response.text)
+                st.error(error_detail(response, "Failed to update asset"))
 
         st.divider()
         st.subheader("Delete Asset")
         confirm_delete = st.checkbox(f"I confirm deleting asset '{selected['asset_id']}'")
         if st.button("Delete Asset", type="primary", disabled=not confirm_delete):
-            response = requests.delete(f"{API_BASE_URL}/assets/{selected['id']}", headers=headers, timeout=10)
-            if response.status_code == 200:
+            response = api_request("DELETE", f"/assets/{selected['id']}", headers=headers)
+            if response is not None and response.status_code == 200:
                 st.success("Asset deleted successfully")
                 st.rerun()
             else:
-                st.error(response.text)
+                st.error(error_detail(response, "Failed to delete asset"))
 
 st.divider()
 st.subheader("All Assets")

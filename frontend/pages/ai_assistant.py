@@ -5,7 +5,7 @@ import requests
 import streamlit as st
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from api_config import API_BASE_URL
+from api_config import API_BASE_URL, api_request
 from ui import hero, inject_styles
 
 st.set_page_config(page_title="AI Assistant", page_icon="🤖")
@@ -25,11 +25,18 @@ if st.button("Generate Insight"):
     if not query:
         st.warning("Please enter a question or request.")
     else:
-        asset_response = requests.get(f"{API_BASE_URL}/assets/", headers=headers, timeout=10)
-        api_response = requests.get(f"{API_BASE_URL}/apis/", headers=headers, timeout=10)
-        dashboard_response = requests.get(f"{API_BASE_URL}/dashboard/", headers=headers, timeout=10)
+        asset_response = api_request("GET", "/assets/", headers=headers)
+        api_response = api_request("GET", "/apis/", headers=headers)
+        dashboard_response = api_request("GET", "/dashboard/", headers=headers)
 
-        if asset_response.status_code == 200 and api_response.status_code == 200 and dashboard_response.status_code == 200:
+        if (
+            asset_response is not None
+            and api_response is not None
+            and dashboard_response is not None
+            and asset_response.status_code == 200
+            and api_response.status_code == 200
+            and dashboard_response.status_code == 200
+        ):
             asset_data = asset_response.json()
             api_data = api_response.json()
             dashboard_data = dashboard_response.json()

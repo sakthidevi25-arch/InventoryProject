@@ -5,7 +5,7 @@ import requests
 import streamlit as st
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from api_config import API_BASE_URL
+from api_config import API_BASE_URL, api_request, error_detail
 from ui import hero, inject_styles
 
 st.set_page_config(page_title="API Inventory", page_icon="🔌")
@@ -23,10 +23,13 @@ AUTH_TYPES = ["OAuth2", "API Key", "JWT", "mTLS", "None"]
 
 
 def fetch_apis():
-    response = requests.get(f"{API_BASE_URL}/apis/", headers=headers, timeout=10)
+    response = api_request("GET", "/apis/", headers=headers)
+    if response is None:
+        st.error("Cannot reach backend. It may still be starting; please try again.")
+        return []
     if response.status_code == 200:
         return response.json()
-    st.error(f"Request failed: {response.status_code} - {response.text}")
+    st.error(f"Request failed: {response.status_code} - {error_detail(response)}")
     return []
 
 
@@ -66,12 +69,12 @@ with tab_create:
 
     if submitted:
         payload = api_payload(api_name, api_path, http_method, application_name, owner, environment, authentication_type, version, description)
-        response = requests.post(f"{API_BASE_URL}/apis/", json=payload, headers=headers, timeout=10)
-        if response.status_code == 200:
+        response = api_request("POST", "/apis/", headers=headers, json_body=payload)
+        if response is not None and response.status_code == 200:
             st.success("API created successfully")
             st.rerun()
         else:
-            st.error(response.text)
+            st.error(error_detail(response, "Failed to create API"))
 
 with tab_manage:
     if not apis:
@@ -97,23 +100,23 @@ with tab_manage:
 
         if updated:
             payload = api_payload(api_name, api_path, http_method, application_name, owner, environment, authentication_type, version, description)
-            response = requests.put(f"{API_BASE_URL}/apis/{selected['id']}", json=payload, headers=headers, timeout=10)
-            if response.status_code == 200:
+            response = api_request("PUT", f"/apis/{selected['id']}", headers=headers, json_body=payload)
+            if response is not None and response.status_code == 200:
                 st.success("API updated successfully")
                 st.rerun()
             else:
-                st.error(response.text)
+                st.error(error_detail(response, "Failed to update API"))
 
         st.divider()
         st.subheader("Delete API")
         confirm_delete = st.checkbox(f"I confirm deleting API '{selected['api_name']}'")
         if st.button("Delete API", type="primary", disabled=not confirm_delete):
-            response = requests.delete(f"{API_BASE_URL}/apis/{selected['id']}", headers=headers, timeout=10)
-            if response.status_code == 200:
+            response = api_request("DELETE", f"/apis/{selected['id']}", headers=headers)
+            if response is not None and response.status_code == 200:
                 st.success("API deleted successfully")
                 st.rerun()
             else:
-                st.error(response.text)
+                st.error(error_detail(response, "Failed to delete API"))
 
 st.divider()
 st.subheader("All APIs")
